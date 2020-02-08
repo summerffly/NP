@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
         {
             close(sock_fd);
 
-            printf("---------------\r\nClient connect in success\r\n---------------\r\n");
+            printf("\r\n---------------\r\nClient connect in success\r\n---------------\r\n");
         
             /********** 向client发送数据 **********/
             char strhello[] = "\r\n---------------\r\nHello Summer\r\n---------------\r\n";
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
                     break;
                 }
                 
-                printf("message status: %d\r\n", ret);
+                printf("message recv ret: %d\r\n", ret);
                 printf("message form client: %s\r\n", buffer);
 
                 write(csock_fd, buffer, sizeof(buffer)-1);

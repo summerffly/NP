@@ -81,12 +81,7 @@ int main(int argc, char *argv[])
         exit(-1);
     }
    
-    /********** 读取server回传的数据 **********/
-    //char recvbuffer[BUFFSIZE];
-    //char sendbuffer[BUFFSIZE];
-    //read(sockfd, recvbuffer, sizeof(recvbuffer)-1);
-    //printf("message form server: %s\n", recvbuffer);
-
+    /********** 创建线程 **********/
     reterror = pthread_create(&a_thread, NULL, thread_func, NULL);
     if( 0 != reterror )
     {
@@ -96,13 +91,24 @@ int main(int argc, char *argv[])
         exit(-1);
     }
 
+    /********** 向server发送数据 **********/
     while(1)
     {
         printf("input: ");
         memset(&sendbuffer, 0, sizeof(sendbuffer));
-        //gets(sendbuffer);
+        
+        // tips 番茄@20200208
+        // fgets()读取会将换行符 '\n' 保存
+        // 然后剩余的空间都用 '\0' 填充
         fgets(sendbuffer, BUFFSIZE, stdin);
-        write(sockfd, sendbuffer, sizeof(sendbuffer)-1);
+        printf("message length: %lu\r\n", strlen(sendbuffer));
+
+        // tips 番茄@20200208
+        // sizeof()计算数组长度，不可用
+        // 改用strlen()，该函数不包含 '\0' 需要补充
+        // int ret = write(sockfd, sendbuffer, sizeof(sendbuffer)-1);
+        int ret = write(sockfd, sendbuffer, strlen(sendbuffer)+1);
+        printf("message send ret: %d\r\n", ret);
     }
     
     /********** 关闭socket **********/
@@ -116,12 +122,12 @@ int main(int argc, char *argv[])
 //------------------------------//
 void sig_int_handler(int sig)
 {
-    printf("---------------\r\n");
+    printf("\r\n---------------\r\n");
 	printf("Got signal: %d\r\n", sig);
     printf("Summer Exit\r\n---------------\r\n");
 
-    exit(0);
 	//(void) signal(sig, SIG_DFL);
+    exit(0);
 }
 
 //------------------------------//
@@ -129,7 +135,7 @@ void sig_int_handler(int sig)
 //------------------------------//
 void *thread_func(void* arg)
 {
-    fprintf(stdout,"Thread created Success\r\n");   // tips 番茄 - 输入输出串流
+    //fprintf(stdout,"Thread created Success\r\n");   // tips 番茄 - 输入输出串流
 
     while(1)
     {
