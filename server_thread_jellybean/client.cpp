@@ -19,11 +19,17 @@
 
 
 //------------------------------//
-//   Global
+//   Global Variables
 //------------------------------//
 int sockfd = 0;
-char recvbuffer[BUFFSIZE];
+
+int retsend = 0;
+int retrecv = 0;
 char sendbuffer[BUFFSIZE];
+char recvbuffer[BUFFSIZE];
+
+bool recvflag = false;
+
 
 //------------------------------//
 //   Function Declaration
@@ -107,8 +113,16 @@ int main(int argc, char *argv[])
         // sizeof()计算数组长度，不可用
         // 改用strlen()，该函数不包含 '\0' 需要补充
         // int ret = write(sockfd, sendbuffer, sizeof(sendbuffer)-1);
-        int ret = write(sockfd, sendbuffer, strlen(sendbuffer)+1);
-        printf("message send ret: %d\r\n", ret);
+        retsend = write(sockfd, sendbuffer, strlen(sendbuffer)+1);
+        printf("message send ret: %d\r\n", retsend);
+
+        recvflag = false;
+
+        while(recvflag == false)
+            usleep(100);
+
+        printf("message recv ret: %d\r\n", retrecv);
+        printf("message form server: %s\n", recvbuffer);
     }
     
     /********** 关闭socket **********/
@@ -139,13 +153,18 @@ void *thread_func(void* arg)
 
     while(1)
     {
-        int ret = read(sockfd, recvbuffer, sizeof(recvbuffer)-1);
-        if(ret == 0)
+        retrecv = read(sockfd, recvbuffer, sizeof(recvbuffer)-1);
+        if(retrecv == 0)
         {
-            printf("---------------\r\nServer shutdown\r\n---------------\r\n");
+            printf("\r\n---------------\r\nServer shutdown\r\n---------------\r\n");
             exit(-1);
         }
-        printf("message form server: %s\n", recvbuffer);
+        else
+        {
+            recvflag = true;
+        }
+        
+        //printf("message form server: %s\n", recvbuffer);
     }
     //pthread_exit("Thread Exit\r\n");
 }

@@ -118,11 +118,12 @@ int main(int argc, char *argv[])
         {
             close(sock_fd);
 
+            // tag 番茄@20200210 - 需要解决消息遗漏
             printf("\r\n---------------\r\nClient connect in success\r\n---------------\r\n");
         
             /********** 向client发送数据 **********/
             char strhello[] = "\r\n---------------\r\nHello Summer\r\n---------------\r\n";
-            write(csock_fd, strhello, sizeof(strhello));
+            write(csock_fd, strhello, strlen(strhello)+1);
 
             char buffer[BUFFSIZE];
             while(1)
@@ -137,7 +138,7 @@ int main(int argc, char *argv[])
                 printf("message recv ret: %d\r\n", ret);
                 printf("message form client: %s\r\n", buffer);
 
-                write(csock_fd, buffer, sizeof(buffer)-1);
+                write(csock_fd, buffer, strlen(buffer)+1);
             }
 
             /********** 关闭socket **********/
