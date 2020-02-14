@@ -28,7 +28,9 @@ int retrecv = 0;
 char sendbuffer[BUFFSIZE];
 char recvbuffer[BUFFSIZE];
 
-bool recvflag = false;
+int recvstatus = 0;
+
+pthread_mutex_t ALOCK = PTHREAD_MUTEX_INITIALIZER;
 
 
 //------------------------------//
@@ -86,7 +88,7 @@ int main(int argc, char *argv[])
         perror("ErrorLog");
         exit(-1);
     }
-   
+
     /********** 创建线程 **********/
     reterror = pthread_create(&a_thread, NULL, thread_func, NULL);
     if( 0 != reterror )
@@ -102,6 +104,10 @@ int main(int argc, char *argv[])
     {
         printf("input: ");
         memset(&sendbuffer, 0, sizeof(sendbuffer));
+
+        pthread_mutex_lock(&ALOCK);   /*** 进入互斥区 ***/
+        recvstatus = 0;
+        pthread_mutex_unlock(&ALOCK);   /*** 离开互斥区 ***/
         
         // tips 番茄@20200208
         // fgets()读取会将换行符 '\n' 保存
@@ -116,13 +122,19 @@ int main(int argc, char *argv[])
         retsend = write(sockfd, sendbuffer, strlen(sendbuffer)+1);
         printf("message send ret: %d\r\n", retsend);
 
-        recvflag = false;
+        pthread_mutex_lock(&ALOCK);   /*** 进入互斥区 ***/
+        recvstatus = 1;
+        pthread_mutex_unlock(&ALOCK);   /*** 离开互斥区 ***/
 
-        while(recvflag == false)
+        while(recvstatus == 1)
             usleep(100);
 
         printf("message recv ret: %d\r\n", retrecv);
-        printf("message form server: %s\n", recvbuffer);
+        printf("message form server: %s", recvbuffer);
+        printf("****************************************\r\n");
+        pthread_mutex_lock(&ALOCK);   /*** 进入互斥区 ***/
+        recvstatus = 3;
+        pthread_mutex_unlock(&ALOCK);   /*** 离开互斥区 ***/
     }
     
     /********** 关闭socket **********/
@@ -156,12 +168,25 @@ void *thread_func(void* arg)
         retrecv = read(sockfd, recvbuffer, sizeof(recvbuffer)-1);
         if(retrecv == 0)
         {
-            printf("\r\n---------------\r\nServer shutdown\r\n---------------\r\n");
+            printf("\r\n--------------------\r\nServer shutdown\r\n--------------------\r\n");
             exit(-1);
         }
         else
         {
-            recvflag = true;
+            if(recvstatus == 0)
+            {
+                printf("\nmessage recv ret: %d\r\n", retrecv);
+                printf("message form server: %s", recvbuffer);
+                printf("****************************************\r\n");
+                printf("input: ");
+                fflush(stdout);   // tips 番茄 - 遇到换行符才会输出，否则fflush强制输出
+            }
+            else if(recvstatus == 1)
+            {
+                pthread_mutex_lock(&ALOCK);   /*** 进入互斥区 ***/
+                recvstatus = 2;
+                pthread_mutex_unlock(&ALOCK);   /*** 离开互斥区 ***/
+            }
         }
         
         //printf("message form server: %s\n", recvbuffer);
