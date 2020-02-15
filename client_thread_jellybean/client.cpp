@@ -168,14 +168,14 @@ void *thread_func(void* arg)
         retrecv = read(sockfd, recvbuffer, sizeof(recvbuffer)-1);
         if(retrecv == 0)
         {
-            printf("\r\n--------------------\r\nServer shutdown\r\n--------------------\r\n");
+            printf("\r\n--------------------\r\nServer Shutdown\r\n--------------------\r\n");
             exit(-1);
         }
         else
         {
             if(recvstatus == 0)
             {
-                printf("\nmessage recv ret: %d\r\n", retrecv);
+                printf("\r\nmessage recv ret: %d\r\n", retrecv);
                 printf("message form server: %s", recvbuffer);
                 printf("****************************************\r\n");
                 printf("input: ");

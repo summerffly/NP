@@ -118,10 +118,12 @@ int main(int argc, char *argv[])
         {
             close(sock_fd);
 
-            printf("\r\n------------------------------\r\nClient connect in success\r\n------------------------------\r\n");
+            printf("\r\n------------------------------\r\n");
+            printf("Client Connect Success\r\n");
+            printf("------------------------------\r\n");
         
             /********** 向client发送数据 **********/
-            char strhello[] = "\r\n---------------\r\nHello Summer\r\n---------------\r\n";
+            char strhello[] = "\r\n>>> Server Connect Success\r\n>>> Hello Summer\r\n";
             write(csock_fd, strhello, strlen(strhello)+1);
 
             char buffer[BUFFSIZE];
@@ -130,7 +132,7 @@ int main(int argc, char *argv[])
                 int retr = read(csock_fd, buffer, sizeof(buffer)-1);
                 if(retr == 0)
                 {
-                    printf("---------------\r\nClient exit\r\n---------------\r\n");
+                    printf("---------------\r\nClient Exit\r\n---------------\r\n");
                     break;
                 }
                 
