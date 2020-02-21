@@ -3,11 +3,6 @@
 //   Coded by 番茄
 //   @summer studio
 //------------------------------//
-// tips 番茄@20200216
-// pthread库不是 Linux 系统默认的库
-// 编译链接需要使用静态库libpthread.a
-// g++ -o server server.cpp -lpthread
-//------------------------------//
 
 
 #include <unistd.h>
@@ -20,7 +15,6 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <signal.h>
-
 #include <sys/select.h>
 
 
@@ -29,13 +23,14 @@
 //------------------------------//
 #define PORT  7788
 #define BUFFSIZE  256
-#define THREADNUM  3
+#define CLIENTMAX  3
 
 
 //------------------------------//
 //   Global Variables
 //------------------------------//
 char retbuffer[BUFFSIZE];
+bool bConnectFull = false;
 
 
 //------------------------------//
@@ -92,7 +87,7 @@ int main(int argc, char *argv[])
     }
     
     /********** 进入监听状态，等待用户发起请求 **********/
-    reterror = listen(sock_fd, 5);
+    reterror = listen(sock_fd, CLIENTMAX);
     if(reterror < 0)
     {
         printf("Failed to listen socket: %d\n", reterror);
@@ -101,53 +96,82 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    /********** select **********/
-    int connect_clinet[10] = {0};
+    /********** select IO复用 **********/
+    int connect_clinet[CLIENTMAX] = {0};
     int connect_num = 0;
+    for(int i=0; i<CLIENTMAX; i++)
+    {
+        connect_clinet[i] = -1;
+    }
 
     int maxfd = -1;
-    fd_set sockdf_set;
-    FD_ZERO(&sockdf_set);
-    FD_SET(sock_fd, &sockdf_set);
+    fd_set sock_fdset;
+    fd_set read_fdset;
+    FD_ZERO(&sock_fdset);
+    FD_ZERO(&read_fdset);
+
+    FD_SET(sock_fd, &sock_fdset);
     maxfd = sock_fd;
 
     while(1)
     {
-        // tag 番茄@20200220 - 单客户端连接正常，多客户端连接异常，需要解决
-        int ret = select(maxfd+1, &sockdf_set, NULL, NULL, NULL);
+        // tips 番茄@20200221 - read_fdset同时是传参和返回，注意区分
+        read_fdset = sock_fdset;
+        int ret = select(maxfd+1, &read_fdset, NULL, NULL, NULL);
         switch(ret)
         {
-            case 0:
+            case 0:   /*** 超时 ***/
                 break;
-            case -1:
+            case -1:   /*** 错误 ***/
                 break;
             default:
-                if(FD_ISSET(sock_fd, &sockdf_set))
+                if(FD_ISSET(sock_fd, &read_fdset))
                 {
                     /********** 接收客户端请求 **********/
-                    struct sockaddr_in clnt_addr;
-                    socklen_t clnt_addr_size = sizeof(clnt_addr);
-                    memset(&clnt_addr, 0, sizeof(clnt_addr));
+                    if(connect_num == CLIENTMAX)
+                    {
+                        printf("------------------------------\r\n");
+                        printf("Connect Full:  Keep Waiting...\r\n");
+                        printf("------------------------------\r\n");
 
-                    int csock_fd = accept(sock_fd, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
+                        bConnectFull = true;
+                        FD_CLR(sock_fd, &sock_fdset);
+                    }
+                    else
+                    {
+                        struct sockaddr_in clnt_addr;
+                        socklen_t clnt_addr_size = sizeof(clnt_addr);
+                        memset(&clnt_addr, 0, sizeof(clnt_addr));
 
-                    FD_SET(csock_fd, &sockdf_set);
-                    connect_clinet[connect_num] = csock_fd;
-                    connect_num++;
-                    if(csock_fd > maxfd)
-                        maxfd = csock_fd;
-                    
-                    printf("------------------------------\r\n");
-                    printf("Client Connect Success\r\n");
-                    printf("------------------------------\r\n");
+                        int csock_fd = accept(sock_fd, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
 
-                    /********** 向client发送数据 **********/
-                    char strhello[] = "\r\n>>> Server Connect Success\r\n>>> Hello Summer\r\n";
-                    write(csock_fd, strhello, strlen(strhello)+1);
+                        FD_SET(csock_fd, &sock_fdset);
+                        if(csock_fd > maxfd)
+                            maxfd = csock_fd;
+                                    
+                        for(int i=0; i<CLIENTMAX; i++)
+                        {
+                            if(connect_clinet[i] == -1)
+                            {
+                                connect_clinet[i] = csock_fd;
+                                connect_num++;
+
+                                break;
+                            }
+                        }
+                        
+                        printf("------------------------------\r\n");
+                        printf("Client Connect Success\r\n");
+                        printf("------------------------------\r\n");
+
+                        /********** 向client发送数据 **********/
+                        char strhello[] = "\r\n>>> Server Connect Success\r\n>>> Hello Summer\r\n";
+                        write(csock_fd, strhello, strlen(strhello)+1);
+                    }
                 }
-                for(int i = 0; i < connect_num; i++)
+                for(int i = 0; i < CLIENTMAX; i++)
                 {
-                    if(FD_ISSET(connect_clinet[i], &sockdf_set))
+                    if(FD_ISSET(connect_clinet[i], &read_fdset))
                     {
                         char buffer[BUFFSIZE];
                         int retr = 0;
@@ -157,8 +181,28 @@ int main(int argc, char *argv[])
                         if(retr == 0)
                         {
                             printf("---------------\r\nClient Exit\r\n---------------\r\n");
-                            FD_CLR(connect_clinet[i], &sockdf_set);
+
+                            FD_CLR(connect_clinet[i], &sock_fdset);
+                            
+                            maxfd = sock_fd;   
+                            for(int i=0; i<CLIENTMAX; i++)
+                            {
+                                if(connect_clinet[i] > maxfd)
+                                {
+                                    maxfd = connect_clinet[i];
+                                }
+                            }
+                            connect_clinet[i] = -1;
+                            connect_num--;
+
+                            if(bConnectFull == true)
+                            {
+                                bConnectFull = false;
+                                FD_SET(sock_fd, &sock_fdset);
+                            }
+
                             close(connect_clinet[i]);
+
                             break;
                         }
                         
