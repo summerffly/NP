@@ -24,7 +24,7 @@
 //------------------------------//
 #define PORT  7788
 #define BUFFSIZE  256
-#define CLIENTMAX  128   // tag 番茄
+#define CLIENTMAX  3
 
 
 //------------------------------//
@@ -98,6 +98,7 @@ int main(int argc, char *argv[])
     }
 
     /********** poll IO复用 **********/
+    // tips 番茄@20200301 - TCP连接数量，也是fds最后下标
     int connect_num = 0;
 
     struct pollfd fds[CLIENTMAX];
@@ -120,17 +121,27 @@ int main(int argc, char *argv[])
                 if( (fds[0].revents & POLLIN) == POLLIN )
                 {
                     /********** 接收客户端请求 **********/
-                    /*
-                    if(connect_num == CLIENTMAX)
+                    if( connect_num == CLIENTMAX )
                     {
                         printf("------------------------------\r\n");
                         printf("Connect Full:  Keep Waiting...\r\n");
                         printf("------------------------------\r\n");
 
                         bConnectFull = true;
+
+                        fds[0].fd = -1;
+                        fds[0].revents = 0;
+
+                        maxfd = 0;
+                        for(int i=1; i<=connect_num; i++)
+                        {
+                            if(fds[i].fd > maxfd)
+                            {
+                                maxfd = fds[i].fd;
+                            }
+                        }
                     }
                     else
-                    */
                     {
                         struct sockaddr_in clnt_addr;
                         socklen_t clnt_addr_size = sizeof(clnt_addr);
@@ -167,7 +178,30 @@ int main(int argc, char *argv[])
                         {
                             printf("---------------\r\nClient Exit\r\n---------------\r\n");
 
-                            // tag 番茄 - 清空fds操作
+                            fds[i].fd = fds[connect_num].fd;
+                            fds[i].events = POLLIN;
+
+                            fds[connect_num].fd = -1;
+                            fds[connect_num].revents = 0;
+
+                            connect_num--;
+
+                            if( bConnectFull == true )
+                            {
+                                bConnectFull = false;
+                                
+                                fds[0].fd = sock_fd;
+                                fds[0].events = POLLIN;
+                            }
+
+                            maxfd = 0;
+                            for(int i=0; i<=connect_num; i++)
+                            {
+                                if(fds[i].fd > maxfd)
+                                {
+                                    maxfd = fds[i].fd;
+                                }
+                            }
 
                             close(fds[i].fd);
 
